@@ -12,19 +12,19 @@
 #define NBT_GZIP            2
 
 /* Tag types */
-#define TAG_END 	           0x00
-#define TAG_BYTE 	          0x01
-#define TAG_SHORT 	         0x02
-#define TAG_INT 	           0x03
-#define TAG_LONG 	          0x04
-#define TAG_FLOAT 	         0x05
-#define TAG_DOUBLE 	        0x06
-#define TAG_BYTE_ARRAY 	    0x07
-#define TAG_STRING 	        0x08
-#define TAG_LIST 	          0x09
-#define TAG_COMPOUND 	      0x0a
-#define TAG_INT_ARRAY 	     0x0b
-#define TAG_LONG_ARRAY	     0x0c
+#define TAG_END             0x00
+#define TAG_BYTE            0x01
+#define TAG_SHORT           0x02
+#define TAG_INT             0x03
+#define TAG_LONG            0x04
+#define TAG_FLOAT           0x05
+#define TAG_DOUBLE          0x06
+#define TAG_BYTE_ARRAY      0x07
+#define TAG_STRING          0x08
+#define TAG_LIST            0x09
+#define TAG_COMPOUND        0x0a
+#define TAG_INT_ARRAY       0x0b
+#define TAG_LONG_ARRAY      0x0c
 
 /* Endianness types */
 #define NBT_BIG_ENDIAN      0x00
