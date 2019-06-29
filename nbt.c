@@ -146,9 +146,59 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
                 node.child_nodes[node.child_nodes_len] = node1;
             }
         }
+        else if(tag == TAG_INT_ARRAY)
+        {
+            uint8_t list_type = 3;
+            
+            size_t alloc_size = nbt_read_len(buffer + stack->buffer_pos, stack->endianness);
+            stack->buffer_pos += 4;
+            
+            node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
+            
+            for(node.child_nodes_len = 0; node.child_nodes_len < alloc_size; ++node.child_nodes_len)
+            {
+                struct NBT_TAG_NODE node1 = stack_try_get_next_node(stack, buffer, buffer_len, list_type, 0);
+                
+                node.child_nodes[node.child_nodes_len] = node1;
+            }
+        }
+        else if(tag == TAG_LONG_ARRAY)
+        {
+            uint8_t list_type = 4;
+            
+            size_t alloc_size = nbt_read_len(buffer + stack->buffer_pos, stack->endianness);
+            stack->buffer_pos += 4;
+            
+            node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
+            
+            for(node.child_nodes_len = 0; node.child_nodes_len < alloc_size; ++node.child_nodes_len)
+            {
+                struct NBT_TAG_NODE node1 = stack_try_get_next_node(stack, buffer, buffer_len, list_type, 0);
+                
+                node.child_nodes[node.child_nodes_len] = node1;
+            }
+        }
     }
     
     return node;
+}
+
+uint32_t nbt_read_uint24(char* buffer, uint8_t endianness)
+{
+    if (endianness == NBT_BIG_ENDIAN)
+    {
+        return (uint32_t)((uint8_t)0                |
+                         (uint8_t)(buffer[0]) << 16 |
+                         (uint8_t)(buffer[1]) << 8  |
+                         (uint8_t)(buffer[2]));
+    }
+    else if(endianness == NBT_LITTLE_ENDIAN)
+    {
+        return (uint32_t)((uint8_t)0                |
+                         (uint8_t)(buffer[2]) << 16 |
+                         (uint8_t)(buffer[1]) << 8  |
+                         (uint8_t)(buffer[0]));
+    }
 }
 
 int32_t nbt_read_len(char* buffer, uint8_t endianness)

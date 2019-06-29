@@ -8,8 +8,8 @@
 
 /* Compression types */
 #define NBT_UNCOMPRESSED    0
-#define NBT_ZLIB            1
-#define NBT_GZIP            2
+#define NBT_GZIP            1
+#define NBT_ZLIB            2
 
 /* Tag types */
 #define TAG_END             0x00
@@ -55,6 +55,7 @@ extern "C"
         size_t payload_len;
     };
 
+    uint32_t nbt_read_uint24(char* buffer, uint8_t endianness); //unsig, 3 bytes
     int32_t nbt_read_len(char* buffer, uint8_t endianness); //sig, 4 bytes
     uint16_t nbt_read_str_len(char* buffer, uint8_t endianness); //unsig, 2 bytes
 
