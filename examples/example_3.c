@@ -66,8 +66,19 @@ void print_value(uint8_t type, char* buf, size_t buf_len, uint8_t endianness)
 
 int main()
 {
+    int x = 0;
+    int z = 0;
+    
+    char path[300];
+    sprintf(path, "%s/r.%d.%d.mca", ".", x >> 5, z >> 5);
+    
     size_t len = 0;
-    char *string = read_file("r.0.0.mca", &len);
+    char *string = read_file(path, &len);
+    if (!string)
+    {
+        printf("region file not found!");
+        return 0;
+    }
     
     const int CAP = 5 * 64 * 1024;
     char decompress_buf[CAP];
@@ -77,8 +88,6 @@ int main()
         struct NBT_STACK stack = get_new_stack(); //open read session
         stack.endianness = NBT_BIG_ENDIAN;
         
-        int x = 3;
-        int z = 5;
         uint32_t content_table_offset = 4 * ((x & 31) + (z & 31) * 32); //xz-indexed
         uint32_t chunk_offset = nbt_read_uint24(string + content_table_offset, stack.endianness) * 4096;
         //skipped padded size byte here
@@ -97,6 +106,30 @@ int main()
             printf("- %d (%.*s) ", current_node.nbt_tag_type, (int)current_node.name_len, current_node.name);
             print_value(current_node.nbt_tag_type, current_node.payload, current_node.payload_len, stack.endianness);
             printf("\n");
+        }
+        
+        printf("-----Sections-----\n");
+        
+        struct NBT_TAG_NODE* sections_node = node_get_child_by_name(chunk_node, "Sections", 8);
+        
+        for(int i = 0; i < sections_node->child_nodes_len; ++i)
+        {
+            struct NBT_TAG_NODE current_node = sections_node->child_nodes[i];
+            
+            
+            
+            printf("- %d (%.*s) ", current_node.nbt_tag_type, (int)current_node.name_len, current_node.name);
+            print_value(current_node.nbt_tag_type, current_node.payload, current_node.payload_len, stack.endianness);
+            printf("\n");
+            
+            for(int j = 0; j < current_node.child_nodes_len; ++j)
+            {
+                struct NBT_TAG_NODE section_node = current_node.child_nodes[j];
+                
+                printf("-- %d (%.*s) ", section_node.nbt_tag_type, (int)section_node.name_len, section_node.name);
+                print_value(section_node.nbt_tag_type, section_node.payload, section_node.payload_len, stack.endianness);
+                printf("\n");
+            }
         }
         
         close_stack(&root_node); //end read session, nodes can no longer be accessed
