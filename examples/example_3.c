@@ -116,8 +116,6 @@ int main()
         {
             struct NBT_TAG_NODE current_node = sections_node->child_nodes[i];
             
-            
-            
             printf("- %d (%.*s) ", current_node.nbt_tag_type, (int)current_node.name_len, current_node.name);
             print_value(current_node.nbt_tag_type, current_node.payload, current_node.payload_len, stack.endianness);
             printf("\n");
