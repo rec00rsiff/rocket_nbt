@@ -45,7 +45,7 @@ void print_value(uint8_t type, char* buf, size_t buf_len, uint8_t endianness)
     }
     else if(type == TAG_INT)
     {
-        printf(" [%d]", nbt_get_int(buf, endianness));
+        printf(" [%d]", nbt_get_int(buf, endianness, 1)); //protobuf encoding(varint)
     }
     else if(type == TAG_LONG)
     {
@@ -70,7 +70,8 @@ int main()
     size_t len = 0;
     
     struct NBT_STACK write_stack = get_new_stack(); //open write session
-    write_stack.endianness = NBT_BIG_ENDIAN;
+    write_stack.endianness = NBT_LITTLE_ENDIAN;
+    write_stack.protobuf = 1;
     
     struct NBT_TAG_NODE wr_root_node;
     const char* root_name = "root_compound";
@@ -88,6 +89,7 @@ int main()
                         write_int_buf,
                         217,
                         write_stack.endianness,
+                        write_stack.protobuf,
                         0,
                         0,
                         0);
@@ -185,6 +187,7 @@ int main()
                         write_int_buf1,
                         777,
                         write_stack.endianness,
+                        write_stack.protobuf,
                         0,
                         0,
                         0);
@@ -255,7 +258,8 @@ int main()
     if (write_buf)
     {
         struct NBT_STACK stack = get_new_stack(); //open read session
-        stack.endianness = NBT_BIG_ENDIAN;
+        stack.endianness = NBT_LITTLE_ENDIAN;
+        stack.protobuf = 1;
         
         struct NBT_TAG_NODE root_node = nbt_read_data(&stack, write_buf, len, decompress_buf, decompress_buf_len);
         

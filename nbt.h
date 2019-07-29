@@ -61,10 +61,15 @@ extern "C"
     
     int8_t  nbt_get_byte(char* buffer);
     int16_t nbt_get_short(char* buffer, uint8_t endianness);
-    int32_t nbt_get_int(char* buffer, uint8_t endianness);
+    int32_t nbt_get_int(char* buffer, uint8_t endianness, uint8_t protobuf);
+    int32_t nbt_get_uvarint(char* buffer, uint8_t* size); //always LE
+    int32_t nbt_get_sigvarint(char* buffer, uint8_t* size); //always LE
     int64_t nbt_get_long(char* in_buffer, uint8_t endianness);
     float   nbt_get_float(char* buffer, uint8_t endianness);
     double  nbt_get_double(char* buffer, uint8_t endianness);
+    
+    int64_t nbt_encode_zigzag_32(int64_t val);
+    int32_t nbt_decode_zigzag_32(int32_t val);
     
     void nbt_write_uint24(uint32_t val, char* buffer, uint8_t endianness); //unsig, 3 bytes
     void nbt_write_len(int32_t val, char* buffer, uint8_t endianness); //sig, 4 bytes
@@ -74,6 +79,8 @@ extern "C"
     void nbt_write_byte(int8_t val, char* buffer);
     void nbt_write_short(int16_t val, char* buffer, uint8_t endianness);
     void nbt_write_int(int32_t val, char* buffer, uint8_t endianness);
+    uint8_t nbt_write_uvarint(int32_t val, char* buffer); //always LE
+    uint8_t nbt_write_sigvarint(int32_t val, char* buffer); //always LE
     void nbt_write_long(int64_t val, char* in_buffer, uint8_t endianness);
     void nbt_write_float(float val, char* buffer, uint8_t endianness);
     void nbt_write_double(double val, char* buffer, uint8_t endianness);
@@ -96,7 +103,7 @@ extern "C"
     
     void nbt_create_short_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, int16_t val, uint8_t endianness, struct NBT_TAG_NODE* child_nodes, size_t child_nodes_len, uint8_t root);
     
-    void nbt_create_int_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, int32_t val, uint8_t endianness, struct NBT_TAG_NODE* child_nodes, size_t child_nodes_len, uint8_t root);
+    void nbt_create_int_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, int32_t val, uint8_t endianness, uint8_t protobuf, struct NBT_TAG_NODE* child_nodes, size_t child_nodes_len, uint8_t root);
     
     void nbt_create_long_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, int64_t val, uint8_t endianness, struct NBT_TAG_NODE* child_nodes, size_t child_nodes_len, uint8_t root);
     
@@ -115,6 +122,7 @@ extern "C"
         size_t buffer_pos;
         
         uint8_t endianness;
+        uint8_t protobuf;
     };
     
     struct NBT_STACK get_new_stack();
