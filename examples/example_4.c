@@ -33,7 +33,7 @@ char* read_file(char *filename, size_t* len)
     return buffer;
 }
 
-void print_value(uint8_t type, char* buf, size_t buf_len, uint8_t endianness)
+void print_value(uint8_t type, char* buf, size_t buf_len, uint8_t endianness, uint8_t protobuf)
 {
     if(type == TAG_BYTE)
     {
@@ -41,15 +41,15 @@ void print_value(uint8_t type, char* buf, size_t buf_len, uint8_t endianness)
     }
     else if(type == TAG_SHORT)
     {
-        printf(" [%d]", nbt_get_short(buf, endianness));
+        printf(" [%d]", nbt_get_short(buf, endianness, protobuf));
     }
     else if(type == TAG_INT)
     {
-        printf(" [%d]", nbt_get_int(buf, endianness, 1)); //protobuf encoding(varint)
+        printf(" [%d]", nbt_get_int(buf, endianness, protobuf)); //protobuf encoding(varint)
     }
     else if(type == TAG_LONG)
     {
-        printf(" [%lld]", nbt_get_long(buf, endianness));
+        printf(" [%lld]", nbt_get_long(buf, endianness, protobuf));
     }
     else if(type == TAG_FLOAT)
     {
@@ -79,7 +79,7 @@ int main()
     struct NBT_TAG_NODE child_nodes[9];
     nbt_create_compound_node(&wr_root_node, (char*)root_name, 9, child_nodes);
     
-    char write_int_buf[4];
+    char write_int_buf[6]; //varint max overhead
     const char* name = "x";
     
     struct NBT_TAG_NODE wr_child_node;
@@ -87,7 +87,7 @@ int main()
                         &wr_child_node,
                         (char*)name,
                         write_int_buf,
-                        217,
+                        0xfffffff,
                         write_stack.endianness,
                         write_stack.protobuf,
                         0,
@@ -108,7 +108,7 @@ int main()
                           0,
                           0);
     
-    char write_long_buf[8];
+    char write_long_buf[10]; //varint max overhead
     const char* name2 = "z";
     
     struct NBT_TAG_NODE wr_child_node2;
@@ -116,8 +116,13 @@ int main()
                          &wr_child_node2,
                          (char*)name2,
                          write_long_buf,
-                         9223372036854775807,
+                         //9223372036854775807,
+                         //-2 -1 -1 -1 31
+                         //-2 -1 -1 -1 1
+                         //-3 -1 -1 -1 -1 -1 -1 -1 31
+                         0xfffffffffffffff,
                          write_stack.endianness,
+                         write_stack.protobuf,
                          0,
                          0,
                          0);
@@ -130,8 +135,9 @@ int main()
                           &wr_child_node3,
                           (char*)name3,
                           write_short_buf,
-                          32767,
+                          8,//32767,
                           write_stack.endianness,
+                          write_stack.protobuf,
                           0,
                           0,
                           0);
@@ -148,7 +154,8 @@ int main()
                         write_str_buf,
                         (char*)str,
                         str_len,
-                        write_stack.endianness);
+                        write_stack.endianness,
+                        write_stack.protobuf);
     
     char write_double_buf[8];
     const char* name5 = "double_test";
@@ -175,7 +182,8 @@ int main()
                          TAG_INT,
                          2,
                          list_child_nodes,
-                         write_stack.endianness);
+                         write_stack.endianness,
+                         write_stack.protobuf);
     
     char write_int_buf1[4];
     const char* lc_name = "";
@@ -213,7 +221,8 @@ int main()
                         write_cc_str_buf,
                         (char*)cc_str,
                         cc_str_len,
-                        write_stack.endianness);
+                        write_stack.endianness,
+                        write_stack.protobuf);
     
     char write_cc_short_buf[4];
     const char* cc_name1 = "val";
@@ -225,6 +234,7 @@ int main()
                           write_cc_short_buf,
                           1464,
                           write_stack.endianness,
+                          write_stack.protobuf,
                           0,
                           0,
                           0);
@@ -269,7 +279,7 @@ int main()
         {
             struct NBT_TAG_NODE current_node = root_node.child_nodes[i];
             printf("- %d (%.*s) ", current_node.nbt_tag_type, (int)current_node.name_len, current_node.name);
-            print_value(current_node.nbt_tag_type, current_node.payload, current_node.payload_len, stack.endianness);
+            print_value(current_node.nbt_tag_type, current_node.payload, current_node.payload_len, stack.endianness, stack.protobuf);
             printf("\n");
             
             for(int j = 0; j < current_node.child_nodes_len; ++j)
@@ -277,7 +287,7 @@ int main()
                 struct NBT_TAG_NODE section_node = current_node.child_nodes[j];
                 
                 printf("-- %d (%.*s) ", section_node.nbt_tag_type, (int)section_node.name_len, section_node.name);
-                print_value(section_node.nbt_tag_type, section_node.payload, section_node.payload_len, stack.endianness);
+                print_value(section_node.nbt_tag_type, section_node.payload, section_node.payload_len, stack.endianness, stack.protobuf);
                 printf("\n");
             }
         }

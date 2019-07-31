@@ -29,8 +29,9 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
             return node;
         }
         
-        node.payload_len = nbt_read_str_len(buffer + stack->buffer_pos, stack->endianness);
-        stack->buffer_pos += 2;
+        uint8_t int_size = 0;
+        node.payload_len = nbt_read_str_len(buffer + stack->buffer_pos, stack->endianness, stack->protobuf, &int_size);
+        stack->buffer_pos += int_size;
         
         node.payload = buffer + stack->buffer_pos;
         stack->buffer_pos += node.payload_len;
@@ -85,8 +86,17 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
         }
         else if(tag == TAG_SHORT)
         {
-            node.payload_len = 2;
             node.payload = buffer + stack->buffer_pos;
+            if(stack->protobuf)
+            {
+                uint8_t size = 0;
+                nbt_get_sigvarint32(node.payload, &size);
+                node.payload_len = size;
+            }
+            else
+            {
+                node.payload_len = 2;
+            }
             stack->buffer_pos += node.payload_len;
         }
         else if(tag == TAG_INT)
@@ -95,7 +105,7 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
             if(stack->protobuf)
             {
                 uint8_t size = 0;
-                nbt_get_sigvarint(node.payload, &size);
+                nbt_get_sigvarint32(node.payload, &size);
                 node.payload_len = size;
             }
             else
@@ -106,8 +116,17 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
         }
         else if(tag == TAG_LONG)
         {
-            node.payload_len = 8;
             node.payload = buffer + stack->buffer_pos;
+            if(stack->protobuf)
+            {
+                uint8_t size = 0;
+                nbt_get_sigvarint64(node.payload, &size);
+                node.payload_len = size;
+            }
+            else
+            {
+                node.payload_len = 8;
+            }
             stack->buffer_pos += node.payload_len;
         }
         else if(tag == TAG_FLOAT)
@@ -124,16 +143,18 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
         }
         else if(tag == TAG_BYTE_ARRAY)
         {
-            node.payload_len = nbt_read_len(buffer + stack->buffer_pos, stack->endianness);
-            stack->buffer_pos += 4;
+            uint8_t int_size = 0;
+            node.payload_len = nbt_read_len(buffer + stack->buffer_pos, stack->endianness, stack->protobuf, &int_size);
+            stack->buffer_pos += int_size;
             
             node.payload = buffer + stack->buffer_pos;
             stack->buffer_pos += node.payload_len;
         }
         else if(tag == TAG_STRING)
         {
-            node.payload_len = nbt_read_str_len(buffer + stack->buffer_pos, stack->endianness);
-            stack->buffer_pos += 2;
+            uint8_t int_size = 0;
+            node.payload_len = nbt_read_str_len(buffer + stack->buffer_pos, stack->endianness, stack->protobuf, &int_size);
+            stack->buffer_pos += int_size;
             
             node.payload = buffer + stack->buffer_pos;
             stack->buffer_pos += node.payload_len;
@@ -143,8 +164,9 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
             uint8_t list_type = buffer[stack->buffer_pos];
             stack->buffer_pos += 1;
             
-            size_t alloc_size = nbt_read_len(buffer + stack->buffer_pos, stack->endianness);
-            stack->buffer_pos += 4;
+            uint8_t int_size = 0;
+            size_t alloc_size = nbt_read_len(buffer + stack->buffer_pos, stack->endianness, stack->protobuf, &int_size);
+            stack->buffer_pos += int_size;
             
             node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
             
@@ -159,8 +181,9 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
         {
             uint8_t list_type = 3;
             
-            size_t alloc_size = nbt_read_len(buffer + stack->buffer_pos, stack->endianness);
-            stack->buffer_pos += 4;
+            uint8_t int_size = 0;
+            size_t alloc_size = nbt_read_len(buffer + stack->buffer_pos, stack->endianness, stack->protobuf, &int_size);
+            stack->buffer_pos += int_size;
             
             node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
             
@@ -175,8 +198,9 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
         {
             uint8_t list_type = 4;
             
-            size_t alloc_size = nbt_read_len(buffer + stack->buffer_pos, stack->endianness);
-            stack->buffer_pos += 4;
+            uint8_t int_size = 0;
+            size_t alloc_size = nbt_read_len(buffer + stack->buffer_pos, stack->endianness, stack->protobuf, &int_size);
+            stack->buffer_pos += int_size;
             
             node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
             
@@ -204,8 +228,7 @@ void stack_write_next_node(struct NBT_TAG_NODE* node, struct NBT_STACK* stack, c
     
     if(node->name_len > 0)
     {
-        nbt_write_str(node->name, node->name_len, buffer + stack->buffer_pos, stack->endianness);
-        stack->buffer_pos += 2 + node->name_len;
+        stack->buffer_pos += nbt_write_str(node->name, node->name_len, buffer + stack->buffer_pos, stack->endianness, stack->protobuf);
     }
     
     if(node->payload_len > 0)
@@ -252,9 +275,15 @@ uint32_t nbt_read_uint24(char* buffer, uint8_t endianness)
     }
 }
 
-int32_t nbt_read_len(char* buffer, uint8_t endianness)
+int32_t nbt_read_len(char* buffer, uint8_t endianness, uint8_t protobuf, uint8_t* size)
 {
-    if (endianness == NBT_BIG_ENDIAN)
+    if(protobuf)
+    {
+        return nbt_get_sigvarint32(buffer, size);
+    }
+    *size = 4;
+    return nbt_get_int(buffer, endianness, protobuf);
+    /*if (endianness == NBT_BIG_ENDIAN)
     {
         return (int32_t)((uint8_t)(buffer[0]) << 24 |
                          (uint8_t)(buffer[1]) << 16 |
@@ -267,11 +296,17 @@ int32_t nbt_read_len(char* buffer, uint8_t endianness)
                          (uint8_t)(buffer[2]) << 16 |
                          (uint8_t)(buffer[1]) << 8  |
                          (uint8_t)(buffer[0]));
-    }
+    }*/
 }
 
-uint16_t nbt_read_str_len(char* buffer, uint8_t endianness)
+uint16_t nbt_read_str_len(char* buffer, uint8_t endianness, uint8_t protobuf, uint8_t* size)
 {
+    if(protobuf)
+    {
+        return nbt_get_uvarint32(buffer, size);
+    }
+    
+    *size = 2;
     if (endianness == NBT_BIG_ENDIAN)
     {
         return (uint16_t)((uint8_t)(buffer[0]) << 8 |
@@ -289,8 +324,13 @@ int8_t nbt_get_byte(char* buffer)
     return (int8_t)(buffer[0]);
 }
 
-int16_t nbt_get_short(char* buffer, uint8_t endianness)
+int16_t nbt_get_short(char* buffer, uint8_t endianness, uint8_t protobuf)
 {
+    if(protobuf)
+    {
+        uint8_t size = 0;
+        return nbt_get_sigvarint32(buffer, &size);
+    }
     if (endianness == NBT_BIG_ENDIAN)
     {
         return (int16_t)((uint8_t)(buffer[0]) << 8 |
@@ -308,7 +348,7 @@ int32_t nbt_get_int(char* buffer, uint8_t endianness, uint8_t protobuf)
     if(protobuf)
     {
         uint8_t size = 0;
-        return nbt_get_sigvarint(buffer, &size);
+        return nbt_get_sigvarint32(buffer, &size);
     }
     if (endianness == NBT_BIG_ENDIAN)
     {
@@ -326,10 +366,10 @@ int32_t nbt_get_int(char* buffer, uint8_t endianness, uint8_t protobuf)
     }
 }
 
-int32_t nbt_get_uvarint(char* buffer, uint8_t* size)
+int32_t nbt_get_uvarint32(char* buffer, uint8_t* size)
 {
     int out = 0;
-    int bytes = 0;
+    uint8_t bytes = 0;
     uint8_t in;
     
     do {
@@ -347,13 +387,18 @@ int32_t nbt_get_uvarint(char* buffer, uint8_t* size)
     return out;
 }
 
-int32_t nbt_get_sigvarint(char* buffer, uint8_t* size)
+int32_t nbt_get_sigvarint32(char* buffer, uint8_t* size)
 {
-    return nbt_decode_zigzag_32(nbt_get_uvarint(buffer, size));
+    return nbt_decode_zigzag_32(nbt_get_uvarint32(buffer, size));
 }
 
-int64_t nbt_get_long(char* in_buffer, uint8_t endianness)
+int64_t nbt_get_long(char* in_buffer, uint8_t endianness, uint8_t protobuf)
 {
+    if(protobuf)
+    {
+        uint8_t size = 0;
+        return nbt_get_sigvarint64(in_buffer, &size);
+    }
     unsigned char* buffer = (unsigned char*)in_buffer;
     if (endianness == NBT_BIG_ENDIAN)
     {
@@ -378,6 +423,32 @@ int64_t nbt_get_long(char* in_buffer, uint8_t endianness)
                          (uint64_t)(buffer[1]) << 8  |
                          (uint64_t)(buffer[0]));
     }
+}
+
+int64_t nbt_get_uvarint64(char* buffer, uint8_t* size)
+{
+    int64_t out = 0;
+    uint8_t bytes = 0;
+    uint8_t in;
+    
+    do {
+        in = *buffer;
+        buffer++;
+        out |= ((uint64_t)( in & 0x7F )) << ((uint64_t)( bytes++ * 7 ));
+        
+        if ( bytes > 10 ) {
+            //overflow
+            return 0;
+        }
+    } while ( ( in & 0x80 ) == 0x80 );
+    
+    *size = bytes;
+    return out;
+}
+
+int64_t nbt_get_sigvarint64(char* buffer, uint8_t* size)
+{
+    return nbt_decode_zigzag_64(nbt_get_uvarint64(buffer, size));
 }
 
 float nbt_get_float(char* buffer, uint8_t endianness)
@@ -448,9 +519,19 @@ int64_t nbt_encode_zigzag_32(int64_t val)
     return ( ( val << 1 ) ^ ( val >> 31 ) );
 }
 
+int64_t nbt_encode_zigzag_64(int64_t val)
+{
+    return (int64_t) ((val << 1) ^ (val >> 63));
+}
+
 int32_t nbt_decode_zigzag_32(int32_t val)
 {
     return (int32_t) ( val >> 1 ) ^ -(int32_t) ( val & 1 );
+}
+
+int64_t nbt_decode_zigzag_64(int64_t val)
+{
+    return (int64_t) ( val >> 1 ) ^ -(int64_t) ( val & 1 );
 }
 
 void nbt_write_uint24(uint32_t val, char* buffer, uint8_t endianness)
@@ -469,13 +550,24 @@ void nbt_write_uint24(uint32_t val, char* buffer, uint8_t endianness)
     }
 }
 
-void nbt_write_len(int32_t val, char* buffer, uint8_t endianness)
+uint8_t nbt_write_len(int32_t val, char* buffer, uint8_t endianness, uint8_t protobuf)
 {
+    if(protobuf)
+    {
+        return nbt_write_sigvarint32(val, buffer);
+    }
+    
     nbt_write_int(val, buffer, endianness);
+    return 4;
 }
 
-void nbt_write_str_len(uint16_t val, char* buffer, uint8_t endianness)
+uint8_t nbt_write_str_len(uint16_t val, char* buffer, uint8_t endianness, uint8_t protobuf)
 {
+    if(protobuf)
+    {
+        return nbt_write_uvarint32(val, buffer);
+    }
+    
     if (endianness == NBT_BIG_ENDIAN)
     {
         buffer[0] = val >> 8;
@@ -486,17 +578,19 @@ void nbt_write_str_len(uint16_t val, char* buffer, uint8_t endianness)
         buffer[0] = val;
         buffer[1] = val >> 8;
     }
+    return 2;
 }
 
-void nbt_write_str(char* str, uint16_t str_len, char* buffer, uint8_t endianness)
+uint8_t nbt_write_str(char* str, uint16_t str_len, char* buffer, uint8_t endianness, uint8_t protobuf)
 {
-    nbt_write_str_len(str_len, buffer, endianness);
-    buffer += 2;
+    uint8_t int_size = nbt_write_str_len(str_len, buffer, endianness, protobuf);
+    buffer += int_size;
     for(int i = 0; i < str_len; ++i)
     {
         buffer[i] = str[i];
     }
     //buffer[0] = (char)222;
+    return str_len + int_size;
 }
 
 void nbt_write_byte(int8_t val, char* buffer)
@@ -504,8 +598,13 @@ void nbt_write_byte(int8_t val, char* buffer)
     buffer[0] = (uint8_t)val;
 }
 
-void nbt_write_short(int16_t val, char* buffer, uint8_t endianness)
+uint8_t nbt_write_short(int16_t val, char* buffer, uint8_t endianness, uint8_t protobuf)
 {
+    if(protobuf)
+    {
+        return nbt_write_sigvarint32(val, buffer);
+    }
+    
     if (endianness == NBT_BIG_ENDIAN)
     {
         buffer[0] = val >> 8;
@@ -516,6 +615,7 @@ void nbt_write_short(int16_t val, char* buffer, uint8_t endianness)
         buffer[0] = val;
         buffer[1] = val >> 8;
     }
+    return 2;
 }
 
 void nbt_write_int(int32_t val, char* buffer, uint8_t endianness)
@@ -536,11 +636,10 @@ void nbt_write_int(int32_t val, char* buffer, uint8_t endianness)
     }
 }
 
-uint8_t nbt_write_uvarint(int32_t val, char* buffer)
+uint8_t nbt_write_uvarint32(uint32_t val, char* buffer)
 {
     uint8_t size = 0;
     while ( ( val & -128 ) != 0 ) {
-        //writebyte( (uint8_t) ( val & 127 | 128 ) );
         *buffer = (uint8_t)(val & 127 | 128);
         buffer++;
         size++;
@@ -553,9 +652,9 @@ uint8_t nbt_write_uvarint(int32_t val, char* buffer)
     return size;
 }
 
-uint8_t nbt_write_sigvarint(int32_t val, char* buffer)
+uint8_t nbt_write_sigvarint32(int32_t val, char* buffer)
 {
-    return nbt_write_uvarint(nbt_encode_zigzag_32(val), buffer);
+    return nbt_write_uvarint32(nbt_encode_zigzag_32(val), buffer);
 }
 
 void nbt_write_long(int64_t val, char* in_buffer, uint8_t endianness)
@@ -582,6 +681,27 @@ void nbt_write_long(int64_t val, char* in_buffer, uint8_t endianness)
         in_buffer[6] = val >> 48;
         in_buffer[7] = val >> 56;
     }
+}
+
+uint8_t nbt_write_uvarint64(uint64_t val, char* buffer)
+{
+    uint8_t size = 0;
+    while ( ( val > 127 ) != 0 ) {
+        *buffer = (uint8_t)(val & 127 | 128);
+        buffer++;
+        size++;
+        val >>= 7;
+    }
+    
+    *buffer = ((uint8_t)val) & 127;
+    buffer++;
+    size++;
+    return size;
+}
+
+uint8_t nbt_write_sigvarint64(int64_t val, char* buffer)
+{
+    return nbt_write_uvarint64(nbt_encode_zigzag_64(val), buffer);
 }
 
 void nbt_write_float(float val, char* buffer, uint8_t endianness)
@@ -648,51 +768,53 @@ void nbt_create_node(struct NBT_TAG_NODE* node, char* name, char* payload, size_
     node->child_nodes = child_nodes;
 }
 
-void nbt_create_list_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, uint8_t list_type, size_t child_capacity, struct NBT_TAG_NODE* child_nodes, uint8_t endianness)
+void nbt_create_list_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, uint8_t list_type, size_t child_capacity, struct NBT_TAG_NODE* child_nodes, uint8_t endianness, uint8_t protobuf)
 {
-    nbt_create_node(node, name, payload_buf, 5,
+    nbt_write_byte(list_type, payload_buf);
+    uint8_t int_size = nbt_write_len((int32_t)child_capacity, payload_buf + 1, endianness, protobuf);
+    
+    nbt_create_node(node, name, payload_buf,
+                    int_size + 1,
                     child_nodes,
                     child_capacity,
                     0);
     node->nbt_tag_type = TAG_LIST;
-    
-    nbt_write_byte(list_type, payload_buf);
-    payload_buf++;
-    
-    nbt_write_len((int32_t)child_capacity, payload_buf, endianness);
 }
 
-void nbt_create_byte_array_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, size_t child_capacity, struct NBT_TAG_NODE* child_nodes, uint8_t endianness)
+void nbt_create_byte_array_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, size_t child_capacity, struct NBT_TAG_NODE* child_nodes, uint8_t endianness, uint8_t protobuf)
 {
-    nbt_create_node(node, name, payload_buf, 4,
+    uint8_t int_size = nbt_write_len((int32_t)child_capacity, payload_buf, endianness, protobuf);
+    
+    nbt_create_node(node, name, payload_buf,
+                    int_size,
                     child_nodes,
                     child_capacity,
                     0);
     node->nbt_tag_type = TAG_BYTE_ARRAY;
-    
-    nbt_write_len((int32_t)child_capacity, payload_buf, endianness);
 }
 
-void nbt_create_int_array_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, size_t child_capacity, struct NBT_TAG_NODE* child_nodes, uint8_t endianness)
+void nbt_create_int_array_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, size_t child_capacity, struct NBT_TAG_NODE* child_nodes, uint8_t endianness, uint8_t protobuf)
 {
-    nbt_create_node(node, name, payload_buf, 4,
+    uint8_t int_size = nbt_write_len((int32_t)child_capacity, payload_buf, endianness, protobuf);
+    
+    nbt_create_node(node, name, payload_buf,
+                    int_size,
                     child_nodes,
                     child_capacity,
                     0);
     node->nbt_tag_type = TAG_INT_ARRAY;
-    
-    nbt_write_len((int32_t)child_capacity, payload_buf, endianness);
 }
 
-void nbt_create_long_array_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, size_t child_capacity, struct NBT_TAG_NODE* child_nodes, uint8_t endianness)
+void nbt_create_long_array_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, size_t child_capacity, struct NBT_TAG_NODE* child_nodes, uint8_t endianness, uint8_t protobuf)
 {
-    nbt_create_node(node, name, payload_buf, 4,
+    uint8_t int_size = nbt_write_len((int32_t)child_capacity, payload_buf, endianness, protobuf);
+    
+    nbt_create_node(node, name, payload_buf,
+                    int_size,
                     child_nodes,
                     child_capacity,
                     0);
     node->nbt_tag_type = TAG_LONG_ARRAY;
-    
-    nbt_write_len((int32_t)child_capacity, payload_buf, endianness);
 }
 
 void nbt_create_compound_node(struct NBT_TAG_NODE* node, char* name, size_t child_capacity, struct NBT_TAG_NODE* child_nodes)
@@ -704,12 +826,16 @@ void nbt_create_compound_node(struct NBT_TAG_NODE* node, char* name, size_t chil
     node->nbt_tag_type = TAG_COMPOUND;
 }
 
-void nbt_create_str_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, char* str, uint16_t str_len, uint8_t endianness)
+void nbt_create_str_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, char* str, uint16_t str_len, uint8_t endianness, uint8_t protobuf)
 {
-    nbt_create_node(node, name, payload_buf, str_len + 2, 0, 0, 0);
+    nbt_create_node(node,
+                    name,
+                    payload_buf,
+                    nbt_write_str(str, str_len, payload_buf, endianness, protobuf),
+                    0,
+                    0,
+                    0);
     node->nbt_tag_type = TAG_STRING;
-    
-    nbt_write_str(str, str_len, payload_buf, endianness);
 }
 
 void nbt_create_byte_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, int8_t val, uint8_t endianness, struct NBT_TAG_NODE* child_nodes, size_t child_nodes_len, uint8_t root)
@@ -720,12 +846,16 @@ void nbt_create_byte_node(struct NBT_TAG_NODE* node, char* name, char* payload_b
     nbt_write_byte(val, payload_buf);
 }
 
-void nbt_create_short_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, int16_t val, uint8_t endianness, struct NBT_TAG_NODE* child_nodes, size_t child_nodes_len, uint8_t root)
+void nbt_create_short_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, int16_t val, uint8_t endianness, uint8_t protobuf, struct NBT_TAG_NODE* child_nodes, size_t child_nodes_len, uint8_t root)
 {
-    nbt_create_node(node, name, payload_buf, 2, child_nodes, child_nodes_len, root);
+    nbt_create_node(node,
+                    name,
+                    payload_buf,
+                    nbt_write_short(val, payload_buf, endianness, protobuf),
+                    child_nodes,
+                    child_nodes_len,
+                    root);
     node->nbt_tag_type = TAG_SHORT;
-    
-    nbt_write_short(val, payload_buf, endianness);
 }
 
 void nbt_create_int_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, int32_t val, uint8_t endianness, uint8_t protobuf, struct NBT_TAG_NODE* child_nodes, size_t child_nodes_len, uint8_t root)
@@ -735,7 +865,7 @@ void nbt_create_int_node(struct NBT_TAG_NODE* node, char* name, char* payload_bu
         nbt_create_node(node,
                         name,
                         payload_buf,
-                        nbt_write_sigvarint(val, payload_buf),
+                        nbt_write_sigvarint32(val, payload_buf),
                         child_nodes,
                         child_nodes_len,
                         root);
@@ -750,12 +880,26 @@ void nbt_create_int_node(struct NBT_TAG_NODE* node, char* name, char* payload_bu
     }
 }
 
-void nbt_create_long_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, int64_t val, uint8_t endianness, struct NBT_TAG_NODE* child_nodes, size_t child_nodes_len, uint8_t root)
+void nbt_create_long_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, int64_t val, uint8_t endianness, uint8_t protobuf, struct NBT_TAG_NODE* child_nodes, size_t child_nodes_len, uint8_t root)
 {
-    nbt_create_node(node, name, payload_buf, 8, child_nodes, child_nodes_len, root);
-    node->nbt_tag_type = TAG_LONG;
+    if(protobuf)
+    {
+        nbt_create_node(node,
+                        name,
+                        payload_buf,
+                        nbt_write_sigvarint64(val, payload_buf),
+                        child_nodes,
+                        child_nodes_len,
+                        root);
+        node->nbt_tag_type = TAG_LONG;
+    }
+    else
+    {
+        nbt_create_node(node, name, payload_buf, 8, child_nodes, child_nodes_len, root);
+        node->nbt_tag_type = TAG_LONG;
     
-    nbt_write_long(val, payload_buf, endianness);
+        nbt_write_long(val, payload_buf, endianness);
+    }
 }
 
 void nbt_create_float_node(struct NBT_TAG_NODE* node, char* name, char* payload_buf, float val, uint8_t endianness, struct NBT_TAG_NODE* child_nodes, size_t child_nodes_len, uint8_t root)
