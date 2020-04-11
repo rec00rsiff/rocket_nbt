@@ -9,6 +9,7 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
 {
     struct NBT_TAG_NODE node;
     node.name_len = 0;
+    node.child_nodes = 0;
     node.child_nodes_len = 0;
     
     uint8_t tag = 0;
@@ -54,26 +55,30 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
         {
             struct NBT_TAG_NODE node1 = stack_try_get_next_node(stack, buffer, buffer_len, 0, 0);
             
-            alloc_size++;
             if (node1.nbt_tag_type == TAG_END)
             {
                 break;
             }
+            alloc_size++;
+            
+            node_close(&node1);
         }
         stack->buffer_pos = roll_back_buffer_pos;
         
-        node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
-        
-        while(1)
+        if(alloc_size)
         {
-            struct NBT_TAG_NODE node1 = stack_try_get_next_node(stack, buffer, buffer_len, 0, 0);
-            if (node1.nbt_tag_type == TAG_END)
+            node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
+            while(1)
             {
-                break;
+                struct NBT_TAG_NODE node1 = stack_try_get_next_node(stack, buffer, buffer_len, 0, 0);
+                if (node1.nbt_tag_type == TAG_END)
+                {
+                    break;
+                }
+                node.child_nodes[node.child_nodes_len] = node1;
+                node.child_nodes_len++;
+                
             }
-            node.child_nodes[node.child_nodes_len] = node1;
-            node.child_nodes_len++;
-            
         }
     }
     else
@@ -168,13 +173,16 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
             size_t alloc_size = nbt_read_len(buffer + stack->buffer_pos, stack->endianness, stack->protobuf, &int_size);
             stack->buffer_pos += int_size;
             
-            node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
-            
-            for(node.child_nodes_len = 0; node.child_nodes_len < alloc_size; ++node.child_nodes_len)
+            if(alloc_size)
             {
-                struct NBT_TAG_NODE node1 = stack_try_get_next_node(stack, buffer, buffer_len, list_type, 0);
+                node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
                 
-                node.child_nodes[node.child_nodes_len] = node1;
+                for(node.child_nodes_len = 0; node.child_nodes_len < alloc_size; ++node.child_nodes_len)
+                {
+                    struct NBT_TAG_NODE node1 = stack_try_get_next_node(stack, buffer, buffer_len, list_type, 0);
+                    
+                    node.child_nodes[node.child_nodes_len] = node1;
+                }
             }
         }
         else if(tag == TAG_INT_ARRAY)
@@ -185,13 +193,16 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
             size_t alloc_size = nbt_read_len(buffer + stack->buffer_pos, stack->endianness, stack->protobuf, &int_size);
             stack->buffer_pos += int_size;
             
-            node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
-            
-            for(node.child_nodes_len = 0; node.child_nodes_len < alloc_size; ++node.child_nodes_len)
+            if(alloc_size)
             {
-                struct NBT_TAG_NODE node1 = stack_try_get_next_node(stack, buffer, buffer_len, list_type, 0);
+                node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
                 
-                node.child_nodes[node.child_nodes_len] = node1;
+                for(node.child_nodes_len = 0; node.child_nodes_len < alloc_size; ++node.child_nodes_len)
+                {
+                    struct NBT_TAG_NODE node1 = stack_try_get_next_node(stack, buffer, buffer_len, list_type, 0);
+                    
+                    node.child_nodes[node.child_nodes_len] = node1;
+                }
             }
         }
         else if(tag == TAG_LONG_ARRAY)
@@ -202,13 +213,16 @@ struct NBT_TAG_NODE stack_try_get_next_node(struct NBT_STACK* stack, char* buffe
             size_t alloc_size = nbt_read_len(buffer + stack->buffer_pos, stack->endianness, stack->protobuf, &int_size);
             stack->buffer_pos += int_size;
             
-            node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
-            
-            for(node.child_nodes_len = 0; node.child_nodes_len < alloc_size; ++node.child_nodes_len)
+            if(alloc_size)
             {
-                struct NBT_TAG_NODE node1 = stack_try_get_next_node(stack, buffer, buffer_len, list_type, 0);
+                node.child_nodes = (struct NBT_TAG_NODE*) malloc(alloc_size*sizeof(struct NBT_TAG_NODE));
                 
-                node.child_nodes[node.child_nodes_len] = node1;
+                for(node.child_nodes_len = 0; node.child_nodes_len < alloc_size; ++node.child_nodes_len)
+                {
+                    struct NBT_TAG_NODE node1 = stack_try_get_next_node(stack, buffer, buffer_len, list_type, 0);
+                    
+                    node.child_nodes[node.child_nodes_len] = node1;
+                }
             }
         }
     }
@@ -273,6 +287,7 @@ uint32_t nbt_read_uint24(char* buffer, uint8_t endianness)
                           (uint8_t)(buffer[1]) << 8  |
                           (uint8_t)(buffer[0]));
     }
+    return 0;
 }
 
 int32_t nbt_read_len(char* buffer, uint8_t endianness, uint8_t protobuf, uint8_t* size)
@@ -283,20 +298,6 @@ int32_t nbt_read_len(char* buffer, uint8_t endianness, uint8_t protobuf, uint8_t
     }
     *size = 4;
     return nbt_get_int(buffer, endianness, protobuf);
-    /*if (endianness == NBT_BIG_ENDIAN)
-    {
-        return (int32_t)((uint8_t)(buffer[0]) << 24 |
-                         (uint8_t)(buffer[1]) << 16 |
-                         (uint8_t)(buffer[2]) << 8  |
-                         (uint8_t)(buffer[3]));
-    }
-    else if(endianness == NBT_LITTLE_ENDIAN)
-    {
-        return (int32_t)((uint8_t)(buffer[3]) << 24 |
-                         (uint8_t)(buffer[2]) << 16 |
-                         (uint8_t)(buffer[1]) << 8  |
-                         (uint8_t)(buffer[0]));
-    }*/
 }
 
 uint16_t nbt_read_str_len(char* buffer, uint8_t endianness, uint8_t protobuf, uint8_t* size)
@@ -317,6 +318,7 @@ uint16_t nbt_read_str_len(char* buffer, uint8_t endianness, uint8_t protobuf, ui
         return (uint16_t)((uint8_t)(buffer[1]) << 8 |
                           (uint8_t)(buffer[0]));
     }
+    return 0;
 }
 
 int8_t nbt_get_byte(char* buffer)
@@ -341,6 +343,7 @@ int16_t nbt_get_short(char* buffer, uint8_t endianness, uint8_t protobuf)
         return (int16_t)((uint8_t)(buffer[1]) << 8 |
                          (uint8_t)(buffer[0]));
     }
+    return 0;
 }
 
 int32_t nbt_get_int(char* buffer, uint8_t endianness, uint8_t protobuf)
@@ -364,6 +367,7 @@ int32_t nbt_get_int(char* buffer, uint8_t endianness, uint8_t protobuf)
                          (uint8_t)(buffer[1]) << 8  |
                          (uint8_t)(buffer[0]));
     }
+    return 0;
 }
 
 int32_t nbt_get_uvarint32(char* buffer, uint8_t* size)
@@ -423,6 +427,7 @@ int64_t nbt_get_long(char* in_buffer, uint8_t endianness, uint8_t protobuf)
                          (uint64_t)(buffer[1]) << 8  |
                          (uint64_t)(buffer[0]));
     }
+    return 0;
 }
 
 int64_t nbt_get_uvarint64(char* buffer, uint8_t* size)
@@ -453,7 +458,7 @@ int64_t nbt_get_sigvarint64(char* buffer, uint8_t* size)
 
 float nbt_get_float(char* buffer, uint8_t endianness)
 {
-    float out;
+    float out = 0;
     
     if(endianness == NBT_BIG_ENDIAN)
     {
@@ -480,7 +485,7 @@ float nbt_get_float(char* buffer, uint8_t endianness)
 
 double nbt_get_double(char* buffer, uint8_t endianness)
 {
-    double out;
+    double out = 0;
     
     
     if(endianness == NBT_BIG_ENDIAN)
@@ -933,7 +938,7 @@ struct NBT_TAG_NODE* node_get_child_by_name(struct NBT_TAG_NODE* node, char* nam
 
 void node_close(struct NBT_TAG_NODE* node)
 {
-    if (node->child_nodes_len == 0)
+    if (node->child_nodes_len == 0 && !(node->child_nodes))
     {
         return;
     }

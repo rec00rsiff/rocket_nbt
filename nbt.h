@@ -2,6 +2,7 @@
 #define nbt_h
 
 #include <stdint.h>
+#include <stddef.h>
 
 #define NBT_STACK_DEPTH     5
 #define NBT_ALLOC_BLOCK     1024
