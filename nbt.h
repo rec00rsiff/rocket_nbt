@@ -45,6 +45,7 @@ extern "C"
     struct NBT_TAG_NODE
     {
         uint8_t nbt_tag_type;
+        uint8_t write_end;
         
         struct NBT_TAG_NODE* child_nodes;
         size_t child_nodes_len;
@@ -62,7 +63,7 @@ extern "C"
     
     int8_t  nbt_get_byte(char* buffer);
     int16_t nbt_get_short(char* buffer, uint8_t endianness, uint8_t protobuf);
-    int32_t nbt_get_int(char* buffer, uint8_t endianness, uint8_t protobuf);
+    int32_t nbt_get_int(unsigned char* buffer, uint8_t endianness, uint8_t protobuf);
     int32_t nbt_get_uvarint32(char* buffer, uint8_t* size);
     int32_t nbt_get_sigvarint32(char* buffer, uint8_t* size);
     int64_t nbt_get_long(char* in_buffer, uint8_t endianness, uint8_t protobuf);
